@@ -23,7 +23,7 @@ public class MainActivity extends AppCompatActivity {
   @Bind(R.id.search_view) SearchView searchView;
   @Bind(R.id.results) RecyclerView results;
 
-  private CompositeSubscription subs;
+  private CompositeSubscription subs = new CompositeSubscription();
 
   // ugly, should use DI in real app
   public static final PublishSubject<String> bus = PublishSubject.create();
