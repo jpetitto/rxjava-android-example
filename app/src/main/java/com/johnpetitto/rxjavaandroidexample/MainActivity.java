@@ -11,24 +11,19 @@ import butterknife.ButterKnife;
 import com.jakewharton.rxbinding.widget.RxSearchView;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import retrofit.GsonConverterFactory;
-import retrofit.Retrofit;
-import retrofit.RxJavaCallAdapterFactory;
 import rx.Observable;
-import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 import rx.subjects.PublishSubject;
+import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends AppCompatActivity {
-  private static final String TAG = MainActivity.class.getName();
-
   @Bind(R.id.search_view) SearchView searchView;
   @Bind(R.id.results) RecyclerView results;
 
-  private Subscription subscription;
+  private CompositeSubscription subs;
 
   // ugly, should use DI in real app
   public static final PublishSubject<String> bus = PublishSubject.create();
@@ -44,36 +39,30 @@ public class MainActivity extends AppCompatActivity {
     results.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL_LIST));
     results.setHasFixedSize(true); // optimization
 
-    bus.subscribe(new Action1<String>() {
+    final GitHubInteractor interactor = new GitHubInteractor();
+
+    subs.add(bus.subscribe(new Action1<String>() {
       @Override public void call(String s) {
-        Toast.makeText(getApplicationContext(), s, Toast.LENGTH_SHORT).show();
+        Toast.makeText(MainActivity.this, s, Toast.LENGTH_SHORT).show();
       }
-    });
+    }));
 
-    Retrofit retrofit = new Retrofit.Builder()
-        .baseUrl("https://api.github.com")
-        .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
-        .addConverterFactory(GsonConverterFactory.create())
-        .build();
-
-    final GitHubService service = retrofit.create(GitHubService.class);
-
-    subscription = RxSearchView.queryTextChanges(searchView)
+    subs.add(RxSearchView.queryTextChanges(searchView)
         .observeOn(Schedulers.io())
         .filter(new Func1<CharSequence, Boolean>() {
           @Override public Boolean call(CharSequence charSequence) {
             return charSequence.length() > 0;
           }
         })
-        .debounce(2, TimeUnit.SECONDS)
+        .debounce(1, TimeUnit.SECONDS)
         .switchMap(new Func1<CharSequence, Observable<SearchResult>>() {
           @Override public Observable<SearchResult> call(CharSequence charSequence) {
-            return service.searchUsers(charSequence.toString());
+            return interactor.searchUsers(charSequence.toString());
           }
         })
-        .map(new Func1<SearchResult, List<SearchItem>>() {
-          @Override public List<SearchItem> call(SearchResult searchResult) {
-            return searchResult.getItems();
+        .flatMap(new Func1<SearchResult, Observable<List<SearchItem>>>() {
+          @Override public Observable<List<SearchItem>> call(SearchResult searchResult) {
+            return Observable.from(searchResult.getItems()).limit(20).toList();
           }
         })
         .observeOn(AndroidSchedulers.mainThread())
@@ -83,14 +72,14 @@ public class MainActivity extends AppCompatActivity {
           }
         }, new Action1<Throwable>() {
           @Override public void call(Throwable throwable) {
-            Toast.makeText(getApplicationContext(), throwable.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, throwable.getMessage(), Toast.LENGTH_SHORT).show();
           }
-        });
+        }));
   }
 
   @Override protected void onDestroy() {
     super.onDestroy();
-    subscription.unsubscribe();
+    subs.unsubscribe();
   }
 
 }
