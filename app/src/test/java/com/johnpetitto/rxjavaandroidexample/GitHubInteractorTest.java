@@ -7,44 +7,46 @@ import com.squareup.okhttp.mockwebserver.MockWebServer;
 import java.util.Collections;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 import retrofit.GsonConverterFactory;
 import retrofit.Retrofit;
 import retrofit.RxJavaCallAdapterFactory;
+import rx.Observable;
+import rx.functions.Func1;
 import rx.observers.TestSubscriber;
 
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 public class GitHubInteractorTest {
-  private SearchResult result;
-  private Retrofit retrofit;
   private LruCache<String, SearchResult> cache;
 
+  @SuppressWarnings("unchecked")
   @Before public void setUp() {
-    result = new SearchResult();
+    cache = mock(LruCache.class);
+    when(cache.get(anyString())).thenReturn(null);
+  }
+
+  @Test public void mockedResponseTest() {
+    SearchResult result = new SearchResult();
     result.setTotalCount(1);
 
     SearchItem item = new SearchItem();
     item.setLogin("octocat");
-    item.setAvatarUrl("https://github.com/images/error/octocat_happy.gif");
+    item.setAvatarUrl("https://avatars.githubusercontent.com/u/583231?v\u003d3");
 
     result.setItems(Collections.singletonList(item));
 
     MockWebServer server = new MockWebServer();
     server.enqueue(new MockResponse().setBody(new Gson().toJson(result)));
 
-    retrofit = new Retrofit.Builder()
+    Retrofit retrofit = new Retrofit.Builder()
         .baseUrl(server.url("/search/repositories?q=octocat"))
         .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
         .addConverterFactory(GsonConverterFactory.create())
         .build();
 
-    // noinspection unchecked
-    cache = Mockito.mock(LruCache.class);
-    Mockito.when(cache.get(Mockito.anyString())).thenReturn(null);
-  }
-
-  @Test public void mockedResponseTest() {
     TestSubscriber<SearchResult> subscriber = new TestSubscriber<>();
-
     new GitHubInteractor(retrofit, cache).searchUsers("octocat").subscribe(subscriber);
 
     subscriber.assertValue(result);
@@ -53,13 +55,29 @@ public class GitHubInteractorTest {
   }
 
   @Test public void realResponseTest() {
-    TestSubscriber<SearchResult> subscriber = new TestSubscriber<>();
+    SearchItem item = new SearchItem();
+    item.setLogin("octocat");
+    item.setAvatarUrl("https://avatars.githubusercontent.com/u/583231?v\u003d3");
+
+    Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl("https://api.github.com")
+        .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build();
+
+    TestSubscriber<SearchItem> subscriber = new TestSubscriber<>();
 
     new GitHubInteractor(retrofit, cache).searchUsers("octocat")
-        .toBlocking() // the only difference
+        .flatMap(new Func1<SearchResult, Observable<SearchItem>>() {
+          @Override public Observable<SearchItem> call(SearchResult result) {
+            return Observable.from(result.getItems());
+          }
+        })
+        .first()
+        .toBlocking() // the main difference
         .subscribe(subscriber);
 
-    subscriber.assertValue(result);
+    subscriber.assertValue(item);
     subscriber.assertNoErrors();
     subscriber.assertCompleted();
   }
