@@ -4,12 +4,13 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.util.LruCache;
-import android.widget.SearchView;
+import android.widget.EditText;
 import android.widget.Toast;
 import butterknife.Bind;
 import butterknife.ButterKnife;
-import com.jakewharton.rxbinding.widget.RxSearchView;
+import com.jakewharton.rxbinding.widget.RxTextView;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import retrofit.GsonConverterFactory;
@@ -23,7 +24,7 @@ import rx.schedulers.Schedulers;
 import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends AppCompatActivity {
-  @Bind(R.id.search_view) SearchView searchView;
+  @Bind(R.id.search_bar) EditText searchBar;
   @Bind(R.id.results) RecyclerView results;
 
   private CompositeSubscription subs = new CompositeSubscription();
@@ -55,14 +56,15 @@ public class MainActivity extends AppCompatActivity {
       }
     }));
 
-    subs.add(RxSearchView.queryTextChanges(searchView)
+    subs.add(RxTextView.textChanges(searchBar)
         .observeOn(Schedulers.io())
+        .skip(1)
+        .debounce(1, TimeUnit.SECONDS)
         .filter(new Func1<CharSequence, Boolean>() {
           @Override public Boolean call(CharSequence charSequence) {
             return charSequence.length() > 0;
           }
         })
-        .debounce(1, TimeUnit.SECONDS)
         .switchMap(new Func1<CharSequence, Observable<SearchResult>>() {
           @Override public Observable<SearchResult> call(CharSequence charSequence) {
             return interactor.searchUsers(charSequence.toString());
@@ -80,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
           }
         }, new Action1<Throwable>() {
           @Override public void call(Throwable throwable) {
-            Toast.makeText(MainActivity.this, throwable.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(MainActivity.class.getName(), throwable.getMessage());
           }
         }));
   }
@@ -89,5 +91,4 @@ public class MainActivity extends AppCompatActivity {
     super.onDestroy();
     subs.unsubscribe();
   }
-
 }
