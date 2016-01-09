@@ -72,7 +72,9 @@ public class MainActivity extends AppCompatActivity {
         })
         .flatMap(new Func1<SearchResult, Observable<List<SearchItem>>>() {
           @Override public Observable<List<SearchItem>> call(SearchResult searchResult) {
-            return Observable.from(searchResult.getItems()).limit(20).toList();
+            return Observable.from(searchResult.getItems())
+                .limit(20)
+                .toList();
           }
         })
         .observeOn(AndroidSchedulers.mainThread())
