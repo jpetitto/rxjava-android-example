@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.LruCache;
 import android.widget.SearchView;
 import android.widget.Toast;
 import butterknife.Bind;
@@ -11,6 +12,9 @@ import butterknife.ButterKnife;
 import com.jakewharton.rxbinding.widget.RxSearchView;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import retrofit.GsonConverterFactory;
+import retrofit.Retrofit;
+import retrofit.RxJavaCallAdapterFactory;
 import rx.Observable;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
@@ -35,7 +39,15 @@ public class MainActivity extends AppCompatActivity {
     results.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL_LIST));
     results.setHasFixedSize(true); // optimization
 
-    final GitHubInteractor interactor = new GitHubInteractor();
+    Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl("https://api.github.com")
+        .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+        .addConverterFactory(GsonConverterFactory.create())
+        .build();
+
+    LruCache<String, SearchResult> cache = new LruCache<>(5 * 1024 * 1024); // 5MiB
+
+    final GitHubInteractor interactor = new GitHubInteractor(retrofit, cache);
 
     subs.add(RxUserBus.sub().subscribe(new Action1<String>() {
       @Override public void call(String s) {
