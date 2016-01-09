@@ -46,7 +46,7 @@ public class SearchRecyclerAdapter extends RecyclerView.Adapter<SearchRecyclerAd
 
       itemView.setOnClickListener(new View.OnClickListener() {
         @Override public void onClick(View v) {
-          MainActivity.bus.onNext(login.getText().toString());
+          RxUserBus.pub(login.getText().toString());
         }
       });
     }

@@ -16,7 +16,6 @@ import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
-import rx.subjects.PublishSubject;
 import rx.subscriptions.CompositeSubscription;
 
 public class MainActivity extends AppCompatActivity {
@@ -24,9 +23,6 @@ public class MainActivity extends AppCompatActivity {
   @Bind(R.id.results) RecyclerView results;
 
   private CompositeSubscription subs = new CompositeSubscription();
-
-  // ugly, should use DI in real app
-  public static final PublishSubject<String> bus = PublishSubject.create();
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -41,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     final GitHubInteractor interactor = new GitHubInteractor();
 
-    subs.add(bus.subscribe(new Action1<String>() {
+    subs.add(RxUserBus.sub().subscribe(new Action1<String>() {
       @Override public void call(String s) {
         Toast.makeText(MainActivity.this, s, Toast.LENGTH_SHORT).show();
       }
