@@ -18,6 +18,11 @@ public class SearchRecyclerAdapter extends RecyclerView.Adapter<SearchRecyclerAd
     this.items = items;
   }
 
+  public void refreshResults(List<SearchItem> items) {
+    this.items = items;
+    notifyDataSetChanged();;
+  }
+
   @Override public SearchItemViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
     View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.search_item, parent, false);
     return new SearchItemViewHolder(view);

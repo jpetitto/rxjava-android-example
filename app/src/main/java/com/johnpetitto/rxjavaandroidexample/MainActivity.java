@@ -11,6 +11,7 @@ import android.widget.Toast;
 import butterknife.Bind;
 import butterknife.ButterKnife;
 import com.jakewharton.rxbinding.widget.RxTextView;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import retrofit.GsonConverterFactory;
@@ -40,6 +41,9 @@ public class MainActivity extends AppCompatActivity {
     results.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL_LIST));
     results.setHasFixedSize(true); // optimization
 
+    final SearchRecyclerAdapter adapter = new SearchRecyclerAdapter(Collections.<SearchItem>emptyList());
+    results.setAdapter(adapter);
+
     Retrofit retrofit = new Retrofit.Builder()
         .baseUrl("https://api.github.com")
         .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
@@ -58,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
 
     subs.add(RxTextView.textChanges(searchBar)
         .observeOn(Schedulers.io())
-        .skip(1)
         .debounce(1, TimeUnit.SECONDS)
         .filter(new Func1<CharSequence, Boolean>() {
           @Override public Boolean call(CharSequence charSequence) {
@@ -80,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
         .observeOn(AndroidSchedulers.mainThread())
         .subscribe(new Action1<List<SearchItem>>() {
           @Override public void call(List<SearchItem> searchItems) {
-            results.setAdapter(new SearchRecyclerAdapter(searchItems));
+            adapter.refreshResults(searchItems);
           }
         }, new Action1<Throwable>() {
           @Override public void call(Throwable throwable) {

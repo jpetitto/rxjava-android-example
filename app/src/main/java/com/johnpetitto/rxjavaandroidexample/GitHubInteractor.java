@@ -4,11 +4,10 @@ import android.util.LruCache;
 import retrofit.Retrofit;
 import rx.Observable;
 import rx.functions.Action1;
+import rx.functions.Func1;
 
 public class GitHubInteractor {
-  private static final int CACHE_SIZE = 5;
   private LruCache<String, SearchResult> cache;
-
   private GitHubService service;
 
   public GitHubInteractor(Retrofit retrofit, LruCache<String, SearchResult> cache) {
@@ -17,16 +16,24 @@ public class GitHubInteractor {
   }
 
   public Observable<SearchResult> searchUsers(final String query) {
-    SearchResult cachedResult = cache.get(query);
-    if (cachedResult != null) {
-      return Observable.just(cachedResult);
-    } else {
-      return service.searchUsers(query)
-          .doOnNext(new Action1<SearchResult>() {
-            @Override public void call(SearchResult searchResult) {
-              cache.put(query, searchResult);
-            }
-          });
-    }
+    return Observable.concat(cachedResults(query), networkResults(query)).first();
+  }
+
+  private Observable<SearchResult> cachedResults(String query) {
+    return Observable.just(cache.get(query))
+        .filter(new Func1<SearchResult, Boolean>() {
+          @Override public Boolean call(SearchResult result) {
+            return result != null;
+          }
+        });
+  }
+
+  private Observable<SearchResult> networkResults(final String query) {
+    return service.searchUsers(query)
+        .doOnNext(new Action1<SearchResult>() {
+          @Override public void call(SearchResult result) {
+            cache.put(query, result);
+          }
+        });
   }
 }
